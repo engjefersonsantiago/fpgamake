@@ -79,6 +79,7 @@ constraint_files={}
 impl_constraint_files={}
 
 parameterizedModuleRe = r'^\s*(\w+)\s*#'
+parameterizedModuleBreakLineRe = r'^\s*(\w+)\s*\n\s*#'
 plainModuleRe = r'^\s*(\w+)\s+(\w+)\s*\(?'
 vhdlLibraryRe = r'^\s*library\s+(\w+);'
 vhdlComponentRe = r'^\s*component\s+(\w+)'
@@ -168,6 +169,7 @@ def scan_module(module, parent_partition=None, parent_module=None):
         return
     vlist = [vpath]
     vseen = []
+    old_line=''
     while True:
         if vlist == []:
             break
@@ -181,19 +183,24 @@ def scan_module(module, parent_partition=None, parent_module=None):
         for line in open(vpath):
             m = re.match(plainModuleRe, line)
             m2 = re.match(parameterizedModuleRe, line)
+            mB2 = re.match(parameterizedModuleBreakLineRe, old_line+line)
             ml = re.match(vhdlLibraryRe, line)
             mc = re.match(vhdlComponentRe, line)
             mi = re.match(vhdlInstanceRe, line)
             mp = re.match(vhdlInstancePa, line)
+            old_line = line
             if ml:
                 library = ml.group(1)
                 print 'vhdl library', ml.group(1)
-                for d in options.vpath:
-                    if os.path.basename(d) == library:
-                        add_to_vhdl_libraries_used(parent_partition, d)
-                        for f in glob.glob(os.path.join(d, "*.vhd*")):
-                            if f not in vseen:
-                                vlist.append(f)
+                if str(ml.group(1)).lower() == "work":
+                    continue
+                else:
+                    for d in options.vpath:
+                        if os.path.basename(d) == library:
+                            add_to_vhdl_libraries_used(parent_partition, d)
+                            for f in glob.glob(os.path.join(d, "*.vhd*")):
+                                if f not in vseen:
+                                    vlist.append(f)
             elif mi or mc or m:
                 if mi:
                     submodule=mi.group(1)
@@ -244,8 +251,11 @@ def scan_module(module, parent_partition=None, parent_module=None):
                     all_module_instances[submodule].append(inst)
                 else:
                     all_module_instances[submodule] = [inst]
-            elif m2:
-                submodule = m2.group(1)
+            elif m2 or mB2:
+                if mB2:
+                    submodule = mB2.group(1)
+                else:
+                    submodule = m2.group(1)
                 if submodule in verilog_keywords:
                     continue
                 #print 'submodule#', m2.group(1)
@@ -643,11 +653,10 @@ if __name__=='__main__':
         print verilog_used
         print 'modules_graph'
         print modules_graph
-	print 'vhdl_used'
-	print vhdl_used
-	print 'vhdl_libraries_used'
-	print vhdl_libraries_used
-
+        print 'vhdl_used'
+        print vhdl_used
+        print 'vhdl_libraries_used'
+        print vhdl_libraries_used
 
     constraint_files['top']      = options.constraints
     impl_constraint_files['top'] = options.implconstraints
