@@ -91,11 +91,20 @@ if {[string length $env(VHDFILES)] > 0} {
 
 if {[info exists env(MODULE_NETLISTS)]} {
     foreach dcp $env(MODULE_NETLISTS) {
-	log_command "read_checkpoint $dcp" "$outputDir/[file tail $dcp].log"
+        log_command "read_checkpoint $dcp" "$outputDir/[file tail $dcp].log"
     }
 }
-foreach ip $env(IP) {
-    log_command "read_ip $ip" $outputDir/temp.log
+
+if {[info exists env(IP)]} {
+    foreach ip $env(IP) {
+        log_command "read_ip $ip" $outputDir/temp.log
+    }
+}
+
+if {[info exists env(PRESYNTH_IP)]} {
+    foreach ip_name $env(PRESYNTH_IP) {
+        log_command "read_checkpoint $ip_name" "$outputDir/[file tail $ip_name].log"
+    }
 }
 
 set verilog_defines ""

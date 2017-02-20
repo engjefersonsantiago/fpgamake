@@ -50,6 +50,7 @@ argparser.add_argument('-s', '--synth', help='Module to synthesize separately', 
 argparser.add_argument('-B', '--board', help='Target board name', default='zedboard')
 argparser.add_argument('-p', '--part', help='Target part name', default='xc7z020clg484-1')
 argparser.add_argument('--xci', help='XCI file to use', default=[], action='append')
+argparser.add_argument('--presynth_ip', help='Pre-synthesized IP (dcp file)', default=[], action='append')
 argparser.add_argument('--chipscope', help='chipscope file to use', default=[], action='append')
 argparser.add_argument('--constraints', help='Constraints file to use (.xdc for Xilinx, .sdc for Altera)', default=[], action='append')
 argparser.add_argument('--implconstraints', help='Physical constraints file to use (.xdc for Xilinx, .sdc for Altera)', default=[], action='append')
@@ -185,14 +186,14 @@ def scan_module(module, parent_partition=None, parent_module=None):
             m2 = re.match(parameterizedModuleRe, line)
             mB2 = re.match(parameterizedModuleBreakLineRe, old_line+line)
             ml = re.match(vhdlLibraryRe, line)
-            mc = re.match(vhdlComponentRe, line)
-            mi = re.match(vhdlInstanceRe, line)
-            mp = re.match(vhdlInstancePa, line)
+            mc = re.match(vhdlComponentRe, str(line).lower())
+            mi = re.match(vhdlInstanceRe, str(line).lower())
+            mp = re.match(vhdlInstancePa, str(line).lower())
             old_line = line
             if ml:
                 library = ml.group(1)
                 print 'vhdl library', ml.group(1)
-                if str(ml.group(1)).lower() == "work":
+                if ml.group(1) == "work":
                     continue
                 else:
                     for d in options.vpath:
@@ -201,7 +202,7 @@ def scan_module(module, parent_partition=None, parent_module=None):
                             for f in glob.glob(os.path.join(d, "*.vhd*")):
                                 if f not in vseen:
                                     vlist.append(f)
-            elif mi or mc or m:
+            elif mi or mc or m or mp:
                 if mi:
                     submodule=mi.group(1)
                     inst = None
@@ -332,6 +333,7 @@ synth_template='''
 %(module)s_VHDL_LIBRARIES = %(vhdlibraries)s
 %(module)s_STUBS = %(module_stubs)s
 %(module)s_IP = %(xcifiles)s
+%(module)s_PRESYNTH_IP = %(presynth_ip)s
 %(module)s_SUBINST = %(subinst)s
 %(module)s_PATH = %(module_path)s
 %(module)s_USER_TCL_SCRIPT = %(user_tcl)s
@@ -419,6 +421,7 @@ def write_xilinx_makefile():
                                    'module_stubs': ' '.join(module_stubs),
                                    'user_tcl': ' '.join(options.tcl) if options.tcl else '',
                                    'xcifiles': ' '.join(options.xci),
+                                   'presynth_ip': ' '.join(options.presynth_ip),
                                    'constraint_files': ' '.join([os.path.abspath(xdc) for xdc in constraint_files['top']]) if 'top' in constraint_files else '',
                                    })
 
@@ -475,7 +478,7 @@ def write_altera_makefile():
             continue
         subinst = []
         module_stubs = []
-        if options.top in modules_used:
+        if options.top in modules_bd_filesused:
             subinst = ([' '.join(module_instances[submodule]) for submodule in set(modules_used[options.top])])
         if module in modules_used:
             module_stubs = ['%s-stub.v' % (m) for m in set(modules_used[module])]
@@ -492,6 +495,7 @@ def write_altera_makefile():
                        'user_tcl': ' '.join(options.tcl) if options.tcl else '',
                        'constraint_files': ' '.join([os.path.abspath(xdc) for xdc in constraint_files['top']]) if 'top' in constraint_files else '',
                        'xcifiles': ' '.join(options.xci),
+                       'presynth_ip': ' '.join(options.presynth_ip),
                        'floorplan': os.path.abspath(options.floorplan) if options.floorplan else '',
         }
         f.write(altera_synth_template % substparam)
@@ -535,6 +539,7 @@ def write_altera_makefile():
                    'vhdlibraries': ' '.join(set(vhdl_libraries_used[module])) if module in vhdl_libraries_used else '',
                    'module_stubs': ' '.join(module_stubs),
                    'xcifiles': ' '.join(options.xci),
+                   'ip_name': ' '.join(options.ip_name),
                    'partitions' : ' '.join(partitions),
                    'subinst': ' '.join(subinst),
                    'oocxdc': ' '.join([' '.join(['Impl/%(inst)s/%(inst)s-ooc-clocks.xdc Impl/%(inst)s/%(inst)s-ooc.xdc'
@@ -625,6 +630,11 @@ if __name__=='__main__':
     for xci in options.xci:
         if not os.path.exists(xci):
             sys.stderr.write('Error: XCI file %s not found\n' % xci)
+            sys.exit(-1)
+
+    for dcp in options.presynth_ip:
+        if not os.path.exists(dcp):
+            sys.stderr.write('Error: DCP file %s not found\n' % dcp)
             sys.exit(-1)
 
     if options.floorplan:
