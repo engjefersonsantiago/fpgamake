@@ -121,6 +121,8 @@ foreach xdc $env(XDC) {
 # STEP#2: run synthesis, report utilization and timing estimates, write checkpoint design
 #
 log_command "synth_design $verilog_defines -name $module -top $module -part $partname -flatten rebuilt -include_dirs \"[dict keys $include_dirs]\" -mode $mode" "$outputDir/synth_design.log"
+report_utilization -hierarchical -file $outputDir/$module-post-synth-util.txt
+report_utilization -file $outputDir/$module-post-synth-util-full.txt
 
 # Remove unused clocks that bluespec compiler exports
 set clock_patterns {CLK_GATE_hdmi_clock_if CLK_*deleteme_unused_clock* CLK_GATE_*deleteme_unused_clock* RST_N_*deleteme_unused_reset*}
