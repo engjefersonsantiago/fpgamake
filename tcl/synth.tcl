@@ -74,6 +74,7 @@ set_property include_dirs [dict keys $include_dirs] [current_fileset]
 if {[string length $env(VFILES)] > 0} {
     log_command "add_files -scan_for_includes $env(VFILES)" $outputDir/verilog.log
 }
+
 if { [info exists ::env(VHDL_LIBRARIES) ] } {
 foreach vhdlib $env(VHDL_LIBRARIES) {
     set library [file tail $vhdlib]
@@ -114,6 +115,12 @@ if {[info exists env(VERILOG_DEFINES)]} {
     }
 }
 
+if {[info exists env(USER_TCL_SCRIPT)]} {
+    foreach item $env(USER_TCL_SCRIPT) {
+	source $item
+    }
+}
+
 foreach xdc $env(XDC) {
     log_command "read_xdc $xdc" "$outputDir/[file tail $xdc].log"
 }
@@ -138,11 +145,6 @@ foreach {pat} "$clock_patterns $clock_gate_pattern" {
 	set net [get_nets -of_objects $port]
 	puts "disconnecting net $net from port $port"
 	disconnect_net -net [get_nets -of_objects $port] -objects $port
-    }
-}
-if {[info exists env(USER_TCL_SCRIPT)]} {
-    foreach item $env(USER_TCL_SCRIPT) {
-	source $item
     }
 }
 

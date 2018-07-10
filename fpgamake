@@ -81,6 +81,7 @@ impl_constraint_files={}
 
 parameterizedModuleRe = r'^\s*(\w+)\s*#'
 parameterizedModuleBreakLineRe = r'^\s*(\w+)\s*\n\s*#'
+plainModuleReBreakLineRe = r'^\s*(\w+)\s*\n\s*(\w+)\s*\n\s*\('
 plainModuleRe = r'^\s*(\w+)\s+(\w+)\s*\(?'
 vhdlLibraryRe = r'^\s*library\s+(\w+);'
 vhdlComponentRe = r'^\s*component\s+(\w+)'
@@ -91,7 +92,7 @@ verilog_keywords = ['assign', 'defparam', 'input', 'module', 'output', 'paramete
 
 def find_in_path(fname, path):
     (basename,ext) = os.path.splitext(fname)
-    extensions = ['.v', '.vhd', '.vhdl']
+    extensions = ['.v', '.vhd', '.vhdl', '.vp']
     if len(ext)>0:
         extensions = [ext]
     for ext in extensions:
@@ -170,6 +171,7 @@ def scan_module(module, parent_partition=None, parent_module=None):
         return
     vlist = [vpath]
     vseen = []
+    old_line2=''
     old_line=''
     while True:
         if vlist == []:
@@ -185,10 +187,12 @@ def scan_module(module, parent_partition=None, parent_module=None):
             m = re.match(plainModuleRe, line)
             m2 = re.match(parameterizedModuleRe, line)
             mB2 = re.match(parameterizedModuleBreakLineRe, old_line+line)
+            mB = re.match(plainModuleReBreakLineRe, old_line2+old_line+line)
             ml = re.match(vhdlLibraryRe, line)
-            mc = re.match(vhdlComponentRe, str(line).lower())
+            mc = re.match(vhdlComponentRe, line)
             mi = re.match(vhdlInstanceRe, str(line).lower())
             mp = re.match(vhdlInstancePa, str(line).lower())
+            old_line2 = old_line
             old_line = line
             if ml:
                 library = ml.group(1)
@@ -202,16 +206,22 @@ def scan_module(module, parent_partition=None, parent_module=None):
                             for f in glob.glob(os.path.join(d, "*.vhd*")):
                                 if f not in vseen:
                                     vlist.append(f)
-            elif mi or mc or m or mp:
+            elif mi or mc or m or mp or mB:
                 if mi:
                     submodule=mi.group(1)
                     inst = None
+                elif mB:
+                    submodule=mB.group(1)
+                    inst = mB.group(2)
+                    #print old_line2+old_line+line 
+                    print 'submodule', submodule, inst
                 elif mp:
                     submodule=mp.group(1)
                     inst = None
                 elif mc:
                     submodule=mc.group(1)
                     inst = None
+                    print 'submodule', submodule, inst
                 else:
                     submodule=m.group(1)
                     inst=m.group(2)
@@ -279,6 +289,10 @@ def process_modules():
         synthdir = os.path.join('Synth', module)
         if not os.path.isdir(synthdir):
             os.makedirs(synthdir)
+        
+        if os.path.isfile(os.path.join(synthdir, vfile)):
+            if os.path.samefile(vpath, os.path.join(synthdir, vfile)):
+                return
         shutil.copyfile(vpath, os.path.join(synthdir, vfile))
 
         stubpath = 'Synth/stubs/%s-stub.v' % module
