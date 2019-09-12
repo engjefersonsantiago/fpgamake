@@ -133,6 +133,7 @@ def map_partname_to_family(partname):
     mapping={'5sg': '\"StratixV\"',  \
              'ep4': '\"StratixIV\"', \
              'xc7':  '\"Virtex7\"',   \
+             'xcv':  '\"U+\"',   \
              }
     try:
         family = mapping[partname[0:3].lower()]
